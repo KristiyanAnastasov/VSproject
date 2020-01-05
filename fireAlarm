@@ -1,0 +1,168 @@
+/*
+ * GLOBAL DEFINITONS
+ */
+#define uint8 unsigned char
+#define cFalse (0 != 0)
+#define cTrue  (0 == 0)
+
+/*
+ * CONFIGURATION DEFINITONS
+ */
+
+#define FireSensorCount 2 
+#define GasSensorCount 1
+#define ManualPointsCount 1
+#define SensorNotWorking 13
+
+/****************************************
+ * Configuration arrays - each value 
+ * represents pin number on Arduino uno
+*****************************************/
+static const uint8 FireSensors[FireSensorCount] = {3,4};
+static const uint8 GasSensors[GasSensorCount] = {2};
+static const uint8 ManualPoints[ManualPointsCount] ={8};
+
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(SensorNotWorking,INPUT_PULLUP);// used as constant inactive for non - configured sensors
+  initFireAlarm();
+  Serial.println("Started Succesfully");
+}
+
+// the loop function runs over and over again forever
+void loop() {
+  Serial.println("looping");
+  FireSensorTask();
+}
+
+/*******************************************
+ * evalautes sensor
+ * 
+ * Returns true if sensor has been connected
+ * otherwise return false.
+ * 
+ * To be used only in init stage
+*******************************************/
+static void evaluteSensor( uint8 pinNumber, boolean activeState )
+{
+  uint8 val  = HIGH;
+  val = digitalRead(pinNumber);
+  if(val == activeState)
+  {
+    digitalWrite(6, LOW);
+    delay(3000);
+    digitalWrite(6, HIGH);
+  }
+}
+
+/*******************************************
+ * fire system task proccess logic
+*******************************************/
+void FireSensorTask( void )
+{
+  uint8 sensorCounter;
+  for(sensorCounter  = 0; sensorCounter < FireSensorCount; sensorCounter++ )
+  {
+    evaluteSensor(FireSensors[sensorCounter],LOW);
+  }
+  for(sensorCounter  = 0; sensorCounter < GasSensorCount; sensorCounter++ )
+  {
+    evaluteSensor(GasSensors[sensorCounter],LOW);
+  }
+  for(sensorCounter  = 0; sensorCounter < ManualPointsCount; sensorCounter++ )
+  {
+    evaluteSensor(ManualPoints[sensorCounter],HIGH);
+  }
+  delay(5000);
+} 
+
+/*******************************************
+ * init all input pins.
+ * To be used only in init
+*******************************************/
+static void initInputs(void)
+{
+  uint8 sensorCounter;
+  
+  for(sensorCounter  = 0; sensorCounter < FireSensorCount; sensorCounter++ )
+  {
+      pinMode(FireSensors[sensorCounter], INPUT);     // fire sensors init
+      (void)firstValue(LOW,FireSensors,sensorCounter);
+  }
+
+  for(sensorCounter  = 0; sensorCounter < GasSensorCount; sensorCounter++ )
+  {
+      pinMode(GasSensors[sensorCounter], INPUT);     // gas sensors init
+      (void)firstValue(LOW,GasSensors,sensorCounter);
+  }  
+  
+  for(sensorCounter  = 0; sensorCounter < ManualPointsCount; sensorCounter++ )
+  {
+      pinMode(ManualPoints[sensorCounter], INPUT_PULLUP);     // manual points init
+      (void)firstValue(HIGH,ManualPoints,sensorCounter);
+  }
+}
+
+/*******************************************
+ * init all output pins.
+ * To be used only in init
+*******************************************/
+static void initOutputs(void)
+{
+  pinMode(5, OUTPUT);     // buzzer vcc
+  digitalWrite(5, HIGH);  
+  
+  pinMode(6, OUTPUT);     // buzzer IO, LOW - Active, High - Inactive
+  digitalWrite(6, HIGH);  
+  
+  pinMode(7, OUTPUT);     // buzzer gnd
+  digitalWrite(7, LOW);  
+}
+
+/*******************************************
+ * Initializes the fire alarm system
+ * use only in setup()
+*******************************************/
+void initFireAlarm()
+{
+  initOutputs();
+  initInputs();
+}
+
+/*******************************************
+ * Implements first value check for input  
+ * ports. 
+ * 
+ * Returns true if sensor has been connected
+ * otherwise return false.
+ * 
+ * uint8 activeState - active state of the sensor
+ * uint8 ConfigurationArray[] 
+ * uint8 arrayIndex - location in configuration array
+ * 
+ * To be used only in init stage
+*******************************************/
+boolean firstValue(uint8 activeState,uint8 ConfigurationArray[], uint8 arrayIndex)
+{
+  if(activeState != digitalRead(ConfigurationArray[arrayIndex]))
+  {
+    return cTrue;
+  }
+  else
+  {
+    String logString = "Sensor on pin " + String(ConfigurationArray[arrayIndex]);
+    Serial.println(logString + " is not present");
+    if(LOW == activeState)
+    {
+      digitalWrite(ConfigurationArray[arrayIndex],HIGH);
+    }
+    else
+    {
+      digitalWrite(ConfigurationArray[arrayIndex],LOW);
+
+    }
+    *(&ConfigurationArray[arrayIndex]) = SensorNotWorking; 
+    return cFalse;
+  }
+}  
